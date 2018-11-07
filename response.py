@@ -177,13 +177,14 @@ class HttpResponseLongPoll(HttpResponseBasic):
 
 
 class HttpResponseWebSocket(HttpResponseBasic):
-    def __init__(self, key, version):
+    def __init__(self, request):
         super().__init__(101, 'Switching Protocols', dict())
         self.magic = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
         self.headers['Upgrade'] = 'websocket'
         self.headers['Connection'] = 'Upgrade'
+        key = request.headers['Sec-WebSocket-Key']
+        version = request.headers['Sec-WebSocket-Version']
         self.headers['Sec-WebSocket-Accept'] = self.calc_handshake_key(key, version)
-        #self.headers['Sec-WebSocket-Protocol'] = 'soap, wamp'
 
         self.born = time.time()
         self.out = False
@@ -250,19 +251,20 @@ class HttpResponseWebSocket(HttpResponseBasic):
             mask = self.recv_bytes[10:14]
             payload, self.recv_bytes = self.recv_bytes[14:14+pack_len], self.recv_bytes[14+pack_len:]
 
-        origin = ''.join([chr(b ^ mask[i % len(mask)]) for i, b in enumerate(payload)])
+        all_bytes = [b ^ mask[i % len(mask)] for i, b in enumerate(payload)]
+        origin = struct.pack("%dB" % len(all_bytes), *all_bytes)
         print("op:", opcode, "len:", pack_len, origin)
 
         if opcode == 0x01:
-            self.on_text_frame(origin.encode())
+            self.on_text_frame(origin)
         elif opcode == 0x02:
-            self.on_bin_frame(origin.encode())
+            self.on_bin_frame(origin)
         elif opcode == 0x08:
-            self.on_close_frame(origin.encode())
+            self.on_close_frame(origin)
         elif opcode == 0x09:
-            self.on_ping_frame(origin.encode())
+            self.on_ping_frame(origin)
         elif opcode == 0x0a:
-            self.on_pong_frame(origin.encode())
+            self.on_pong_frame(origin)
         else:
             print("** Error: unsupported opcode", opcode)
             self.abort()
@@ -273,6 +275,9 @@ class HttpResponseWebSocket(HttpResponseBasic):
 
         frame = self.send_quene.pop(0)
         request.write(frame)
+
+        if frame[0] == b'\x88':
+            self.mark_body_sent()
 
     def close(self):
         frame = self.make_close_frame(b'closed!')
@@ -303,7 +308,10 @@ class HttpResponseWebSocket(HttpResponseBasic):
         pass
 
     def on_text_frame(self, data):
+        obj = json.loads(data.decode())
         self.send_text(data)
+        if 'close' in obj:
+            self.close()
 
     def on_bin_frame(self, data):
         self.send_bin(data)
