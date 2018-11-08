@@ -5,6 +5,7 @@
 ## 支持的功能
 - 普通http请求
 - http长连接
+- URL参数列表
 - websocket
 - 扩展TCP通讯
 - 兼容django渲染模板
@@ -15,6 +16,8 @@
     import path
     from response import *
     from template import render
+    from request import HttpRequest
+    from httpd import TCPServerBasic
 
     @path.route(path='/', method=['GET'])
     def index(request):
@@ -24,7 +27,7 @@
     @path.route(path='/redir/', method=['GET'])
     def index(request):
         return HttpResponseRedirect("http://www.baidu.com")
-    
+
     
     @path.route(path='/json/', method=['GET'])
     def index(request):
@@ -35,6 +38,48 @@
     def index(request, msg, id):
         return msg + str(id)
 
+    server = TCPServerBasic('127.0.0.1', 8000, HttpRequest)
+    server.run_forever()
+
+### 创建文件测试文件echo.py测试websocket
+    import path
+    from response import *
+    from template import render
+    from request import HttpRequest
+    from httpd import TCPServerBasic
+
+    class WebSocketEcho(HttpResponseWebSocket):
+        def __init__(self, request):
+            super().__init__(request)
+        
+        def on_text_frame(self, data):
+            """
+                called while receive a text frame
+                return None
+            """
+            self.send_text(data)
+        
+        def on_bin_frame(self, data):
+            """
+                called while receive a binary frame
+                return None
+            """
+            self.send_bin(data)
+        
+        def on_close_frame(self, data):
+            """
+                called while receive a close frame
+                return None
+            """
+            self.close()
+        
+        def on_connection_down(self, request):
+            """
+                called while the connection is lost
+                return None
+            """
+            print(request.path, "websocket is down.")
+        
 
     @path.route(path='/live/', method=['GET'])
     def index(request):
@@ -46,10 +91,23 @@
         except:
             return HttpResponseBadRequest()
     
-        return HttpResponseWebSocket(request)
-### 创建测试文件test.py
-    from request import HttpRequest
-    from httpd import TCPServerBasic
+        return WebSocketEcho(request)
+
 
     server = TCPServerBasic('127.0.0.1', 8000, HttpRequest)
     server.run_forever()
+    
+#### js测试脚本
+    var ws = new WebSocket("ws://localhost:8000/live/");
+    ws.onopen = function(evt) {
+        console.log("Connection open ...");
+    };
+    ws.onclose = function(evt){
+        console.log("connection closed...")
+    };
+    ws.onmessage = function(evt) {
+        console.log(evt.data)
+    }
+
+    ws.send(JSON.stringify({id:10, name:"杭州", close: true}))
+    ws.close()

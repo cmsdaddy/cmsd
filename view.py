@@ -36,6 +36,41 @@ def index(request, msg, id):
         console.log("connection closed...")
     };
 """
+
+
+class WebSocketEcho(HttpResponseWebSocket):
+    def __init__(self, request):
+        super().__init__(request)
+
+    def on_text_frame(self, data):
+        """
+            called while receive a text frame
+            return None
+        """
+        self.send_text(data)
+
+    def on_bin_frame(self, data):
+        """
+            called while receive a binary frame
+            return None
+        """
+        self.send_bin(data)
+
+    def on_close_frame(self, data):
+        """
+            called while receive a close frame
+            return None
+        """
+        self.close()
+
+    def on_connection_down(self, request):
+        """
+            called while the connection is lost
+            return None
+        """
+        print(request.path, "websocket is down.")
+
+
 @path.route(path='/live/', method=['GET'])
 def live(request):
     try:
@@ -46,4 +81,4 @@ def live(request):
     except:
         return HttpResponseBadRequest()
 
-    return HttpResponseWebSocket(request)
+    return WebSocketEcho(request)
