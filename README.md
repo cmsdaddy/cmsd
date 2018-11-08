@@ -1,17 +1,17 @@
-#cmsd
+# cmsd
 自定义基于select方法的循环式简单http服务器.
 
 
-##支持的功能
-* 普通http请求
-* http长连接
-* websocket
-* 扩展TCP通讯
-* 兼容django渲染模板
+## 支持的功能
+- 普通http请求
+- http长连接
+- websocket
+- 扩展TCP通讯
+- 兼容django渲染模板
 
 
-##使用http服务器
-###创建视图文件view.py
+## 使用http服务器
+### 创建视图文件view.py
     import path
     from response import *
     from template import render
@@ -47,7 +47,7 @@
             return HttpResponseBadRequest()
     
         return HttpResponseWebSocket(request)
-###创建测试文件test.py
+### 创建测试文件test.py
     from request import HttpRequest
     from httpd import TCPServerBasic
 
